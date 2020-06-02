@@ -1,26 +1,99 @@
+import json
+import scores as s
+import numpy as np
 import pandas as pd
+import autoSVR as svr
+
+path = 'D:/Users/NKings/Documents/PUC/Data_Science/Dataset/Dataset_ind/'
 
 
-path = 'D:/Users/NKings/Documents/PUC/Data_Science/Dataset/'
+df = pd.read_csv(path + 'FOODS_1_001_CA_1_validation.csv')
+df.fillna(-99999, inplace=True) #retira os valores NaN e substitui por -99999
 
-# Divide a base por estado
-def split_df(path, state):
-    '''Recebe o caminho da base e a sigla de um estado (CA, TX, WI)'''
+# produtos = df['ID']
 
-    X = pd.read_csv(path + 'sales_train_validation.csv')
-    count = 1
-    lista = []
-    df_result = pd.DataFrame()
-    for i in X.itertuples():
-        stt = i.state_id
-        if stt == state:
-            count += 1
-            lista.append(i)
-    
-    df_result = pd.DataFrame(lista)
-    df_result.drop(['Index'], axis=1, inplace=True)
-    
-    df_result.to_csv('state_' + state + '.csv', index=False)
-    print('Done!')
+# Nenhum historico eh utilizado, apenas o valor atual,
+# mas pode configurar essa variavel para adicionar outras N medicoes
+look_back = 1
 
-split_df(path, 'CA')
+forcast_col = 'Qtd_dia'
+forcast_name = 'TARGET'
+
+# listas para armazenar as metricas
+# MAPE_list = []
+# MAE_list = []
+# MSE_list = []
+# RMSE_list = []
+# R2_list = []
+
+# skipDone = False
+# lastID = 'FOODS_3_827_CA_4_validation'
+
+# Cria colunas novas para o tamanho de look_back
+for i in range(look_back):
+    df[forcast_col + "_" + str(i+1)] = df[forcast_col].shift(-(i+1))
+
+# cria a coluna de target
+df[forcast_name] = df[forcast_col].shift(-look_back-1)
+df.dropna(inplace=True)
+
+X = np.array(df)
+#X = scalerX.fit_transform(X)
+# X_lately = X[-look_back:]
+# X = X[:-look_back:]
+y = np.array(df[forcast_name]).reshape(-1, 1)
+#y = scalerY.fit_transform(y)
+
+index = int(X.shape[0]*0.7)
+X_train = X[:index,:]
+X_test = X[index:,:]
+y_train = y[:index]
+y_test = y[index:]
+
+print("X_train", X_train.shape)
+print("X_test", X_test.shape)
+print("y_train", y_train.shape)
+print("y_test", y_test.shape)
+
+#y_test_real = scalerY.inverse_transform(y)[index:]
+
+######################################################
+# TREINAMENTO DO MODELO
+######################################################
+
+model = svr.gridSVR()
+model.fit(X_train, y_train.reshape(-1,), True)
+
+
+print("OBTENDO PREDICTS...")
+#OBTENDO PREDICTS
+trainPredictNorm = model.predict(X_train)
+testPredictNorm = model.predict(X_test)
+
+
+# trainPredict = scalerY.inverse_transform(trainPredictNorm.reshape(-1, 1))
+# testPredict = scalerY.inverse_transform(testPredictNorm.reshape(-1, 1))
+
+
+###########################################################################
+# METRICAS
+###########################################################################
+
+score = s.Score(['mape', 'mae', 'mse', 'rmse', 'r2'])
+# metrics = score.get_scores(y_test, testPredict)
+metrics_norm = score.get_scores(y_test, testPredictNorm)
+#print("Métricas: ", metrics)
+print("Métricas normalizadas: ", metrics_norm)
+
+# with open("results/maioba_consumo/" + '.json', 'w') as outfile:
+#     json.dump(metrics, outfile)
+
+with open('_norm.json', 'w') as outfile:
+    json.dump(metrics_norm, outfile)
+
+# MAPE_list = metrics_norm["mape"]
+# MAE_list = metrics_norm["mae"]
+# MSE_list = metrics_norm["mse"]
+# RMSE_list = metrics_norm["rmse"]
+# R2_list = metrics_norm["r2"]
+
