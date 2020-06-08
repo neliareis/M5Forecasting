@@ -34,7 +34,7 @@ class gridSVR:
                     'gamma': np.logspace(self._g_begin, self._g_end, self._g_qtd),
                     'epsilon': np.logspace(self._p_begin, self._p_end, self._p_qtd)
                 },
-                cv=5, scoring="neg_mean_absolute_error", verbose=0, n_jobs=-1)
+                cv=5, scoring="neg_mean_absolute_error", verbose=0, n_jobs=2)
 
         grid_result = gsc.fit(X_train, y_train)
         best_params = grid_result.best_params_

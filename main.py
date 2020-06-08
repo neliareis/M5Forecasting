@@ -3,12 +3,13 @@ import scores as s
 import numpy as np
 import pandas as pd
 import autoSVR as svr
+from sklearn import preprocessing as skp
 
 path = 'D:/Users/NKings/Documents/PUC/Data_Science/Dataset/Dataset_ind/'
 
 
 df = pd.read_csv(path + 'FOODS_1_001_CA_1_validation.csv')
-df.fillna(-99999, inplace=True) #retira os valores NaN e substitui por -99999
+# df.fillna(-99999, inplace=True) # retira os valores NaN e substitui por -99999
 
 # produtos = df['ID']
 
@@ -18,6 +19,10 @@ look_back = 1
 
 forcast_col = 'Qtd_dia'
 forcast_name = 'TARGET'
+
+# Normalizando dados
+scalerY = skp.MinMaxScaler(feature_range=(0, 1))
+scalerX = skp.MinMaxScaler(feature_range=(0, 1))
 
 # listas para armazenar as metricas
 # MAPE_list = []
@@ -38,11 +43,11 @@ df[forcast_name] = df[forcast_col].shift(-look_back-1)
 df.dropna(inplace=True)
 
 X = np.array(df)
-#X = scalerX.fit_transform(X)
-# X_lately = X[-look_back:]
-# X = X[:-look_back:]
+X = np.array(df.drop([forcast_name], 1))
+X = scalerX.fit_transform(X)
+
 y = np.array(df[forcast_name]).reshape(-1, 1)
-#y = scalerY.fit_transform(y)
+y = scalerY.fit_transform(y)
 
 index = int(X.shape[0]*0.7)
 X_train = X[:index,:]
@@ -55,7 +60,7 @@ print("X_test", X_test.shape)
 print("y_train", y_train.shape)
 print("y_test", y_test.shape)
 
-#y_test_real = scalerY.inverse_transform(y)[index:]
+y_test_real = scalerY.inverse_transform(y)[index:]
 
 ######################################################
 # TREINAMENTO DO MODELO
@@ -71,24 +76,24 @@ trainPredictNorm = model.predict(X_train)
 testPredictNorm = model.predict(X_test)
 
 
-# trainPredict = scalerY.inverse_transform(trainPredictNorm.reshape(-1, 1))
-# testPredict = scalerY.inverse_transform(testPredictNorm.reshape(-1, 1))
+trainPredict = scalerY.inverse_transform(trainPredictNorm.reshape(-1, 1))
+testPredict = scalerY.inverse_transform(testPredictNorm.reshape(-1, 1))
 
 
 ###########################################################################
 # METRICAS
 ###########################################################################
 
-score = s.Score(['mape', 'mae', 'mse', 'rmse', 'r2'])
-# metrics = score.get_scores(y_test, testPredict)
-metrics_norm = score.get_scores(y_test, testPredictNorm)
-#print("Métricas: ", metrics)
+score = s.Score(['rmsse', 'mase', 'mape', 'mae', 'mse', 'rmse', 'r2'])
+metrics = score.get_scores(y_test, testPredict, X_test)
+metrics_norm = score.get_scores(y_test, testPredictNorm, X_test)
+print("Métricas: ", metrics)
 print("Métricas normalizadas: ", metrics_norm)
 
-# with open("results/maioba_consumo/" + '.json', 'w') as outfile:
-#     json.dump(metrics, outfile)
+with open('results/metrics.json', 'w') as outfile:
+    json.dump(metrics, outfile)
 
-with open('_norm.json', 'w') as outfile:
+with open('results/metrics_norm.json', 'w') as outfile:
     json.dump(metrics_norm, outfile)
 
 # MAPE_list = metrics_norm["mape"]
